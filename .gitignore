@@ -1,0 +1,6 @@
+env
+.env
+readme
+.readme
+node_modules/
+uploads/
