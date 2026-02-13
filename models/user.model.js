@@ -31,6 +31,9 @@ const User = mongoose.model('User',{
     },
     date : {
         type : Date
+    },
+    publicId: {
+        type : String
     }
 
 })

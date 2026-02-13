@@ -1,27 +1,15 @@
 const express = require('express');
-const multer = require('multer')
-const { addUser, signIn, byId, listUsers, deleteUser, udpateUser } = require('../controllers/user.controller');
+ const { addUser, signIn, byId, listUsers, deleteUser, udpateUser } = require('../controllers/user.controller');
 const { verifyToken } = require('../config/auth/middleware');
+const upload = require("../config/multerUser");
 const router =  express.Router();
-
-let fileName='';
-let myStorage = multer.diskStorage({
-    destination : './uploads/users',
-    filename : (req,file,redirect)=>{
-        fileName = Date.now()+'.'+file.mimetype.split('/')[1];
-        redirect(null,fileName);
-    }
-})
-let upload = multer({storage : myStorage});
-
-
 router.post('/createuser', verifyToken ,upload.single('image'),(req,res)=>{
-    addUser(req,res,fileName);
-    fileName='';
+    const imageUrl = req.file ? req.file.path : null;
+    addUser(req,res,imageUrl);
 });
 router.put('/updateuser/:id', verifyToken ,upload.single('image'),(req,res)=>{
-    udpateUser(req,res,fileName);
-    fileName = '';
+    const imageUrl = req.file ? req.file.path : null;
+    udpateUser(req,res,imageUrl);
 })
 router.post('/signin',upload.none(),signIn);
 router.get('/userbyid/:id', verifyToken ,byId);

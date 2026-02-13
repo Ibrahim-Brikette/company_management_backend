@@ -1,8 +1,7 @@
-
+require('dotenv').config();
 const express = require('express');
 const { addAdmin } = require('./controllers/user.controller');
 const cors = require('cors');
-require('dotenv').config();
 require('./config/connect');
 
 
@@ -11,7 +10,7 @@ const userRoute = require('./routes/user.route');
 const clientRoute = require('./routes/client.route');
 const boardRoute = require('./routes/board.route');
 const projectRoute = require('./routes/project.route');
-const { downloadFile } = require('./controllers/project.controller');
+// const { downloadFile } = require('./controllers/project.controller');
 
 
 
@@ -41,7 +40,7 @@ app.use('/project',projectRoute);
 app.use('/images/users',express.static('./uploads/users'));
 app.use('/images/clients',express.static('./uploads/clients'));
 app.use('/files',express.static('./uploads/files'));
-app.get('/files/projects/:filename', downloadFile);
+// app.get('/files/projects/:filename', downloadFile);
 
 // ============================================
 // ROUTE 3: DELETE FILE

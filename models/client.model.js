@@ -22,6 +22,9 @@ const Client = mongoose.model('Client',{
     },
     date : {
         type : Date
+    },
+    publicId : {
+        type : String
     }
 
 })

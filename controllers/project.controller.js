@@ -1,8 +1,6 @@
-const { log } = require("console");
-const Project = require("../models/project.model");
-const { createBoard, deleteBoard, deleteProjectBoard } = require("./board.controller");
-const fs = require('fs');
-const path = require('path');
+const Project = require("../models/project.model"); 
+const cloudinary = require('../config/cloudinary');
+const { createBoard, deleteProjectBoard } = require("./board.controller");
 
 const createProject = async (req,res,fileNames)=>{
     try{
@@ -15,7 +13,12 @@ const createProject = async (req,res,fileNames)=>{
         project.date = new Date();
         
         project.team = JSON.parse(data.team);
-        project.files =  fileNames ;
+        if(req.files && req.files.length > 0){
+            project.files = req.files.map(file =>({
+                url : file.path,
+                publicId : file.filename
+            }))
+        }
         
         let newProject = await project.save();
         createBoard(newProject._id)
@@ -39,12 +42,25 @@ const byId = async(req,res)=>{
     }
     
 }
-const updateProject = async ( req,res,fileNames ) => {
+const updateProject = async ( req,res ) => {
     try{
-        console.log(req.body);
-        
+        console.log(req.body); 
         let data = req.body ;
-        if(fileNames.length > 0) data.files = fileNames ;
+        // if(req.files && req.files.length > 0){
+        //     data.files = req.files.map(file =>({
+        //         url : file.path,
+        //         publicId : file.filename
+        //     }))
+        // }
+        if (req.files && req.files.length > 0) {
+            const newFiles = req.files.map(file => ({
+                url: file.path,
+                publicId: file.filename
+            }));
+
+            data.files.push(...newFiles);
+        }
+        if(data.team===0) return res.status(400).json({message : "there is no employees"})
         data.team = JSON.parse(data.team);
         let toupdateProject = await Project.findByIdAndUpdate({ _id : req.params.id },data);
         res.status(200).send(toupdateProject);
@@ -58,11 +74,21 @@ const updateProject = async ( req,res,fileNames ) => {
 const deleteProject = async ( req,res ) => {
     try{    
         let board = await deleteProjectBoard(req.params.id,res);
-        let project = await Project.findByIdAndDelete({ _id : req.params.id });
+        let project = await Project.findById({ _id:req.params.id  })
+        if(!project) return res.status(400).json({
+            message : "project not found"
+        })
+        if(project.files && project.files.length > 0 )
+        for (const file of project.files) {
+            await cloudinary.uploader.destroy(file.publicId)
+            
+        };
+
+        let projectTodelete = await Project.findByIdAndDelete({ _id : req.params.id });
         res.send(200).json({
             success : true,
             message : 'Project and its board deleted successfully',
-            project,
+            projectTodelete,
             board
         })
         
@@ -117,29 +143,38 @@ const list = async( req,res )=>{
     }
 
 }
-const downloadFile = (req, res) => {
+const downloadFile = async (req, res) => {
   try {
-    const fileName = req.params.filename;
-    const filePath = "./uploads/files/" + fileName;
-
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
+    const fileTod = req.body.file;
+    const project = Project.findOne({file: fileTod})
+    if (!project) {
       return res.status(404).json({
         success: false,
-        message: 'File not found'
+        message: "Project not found"
+      });
+    }
+    const file = project.files.find(f => f.publicId === fileTod.publicId);
+
+    if (!file) {
+      return res.status(404).json({
+        success: false,
+        message: "File not found"
       });
     }
 
-    // Send file to user
-    res.download(filePath, fileName, (err) => {
-      if (err) {
-        console.error('Download error:', err);
-        res.status(500).json({
-          success: false,
-          message: 'Failed to download file one'
-        });
-      }
+    // Force download using Cloudinary
+    const downloadUrl = file.url + "?fl_attachment=true";
+
+    res.status(200).json({
+      success: true,
+      url: downloadUrl
     });
+
+
+    // Check if file exists
+
+    // Send file to user
+     
 
   } catch (error) {
     console.error('Download error:', error);
@@ -150,24 +185,27 @@ const downloadFile = (req, res) => {
     });
   }
 }
-const deleteFile = async (req, res) => {
+const deleteFile = async(req, res) => {
   try {
-    const fileName = req.params.filename;
-    const filePath = "./uploads/files/" + fileName;
+    const filename = req.body.publicId;
+    console.log(filename);
     const projectId = req.params.id;
-    project = await Project.findByIdAndUpdate(
-      projectId,
-      { $pull: { files: fileName } },
-      { new: true }
-    );
-
-    // Check if file exists
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-
-    // Send file to user
-    res.status(200).send(project);
+    const project = await Project.findById({_id : projectId}) ;
+    console.log(project.files);
+    
+    if(!project) return res.status(400).send({
+        messaage : "project not found"
+    })
+    const file = project.files.find(f=> f.publicId === filename);
+    if(!file ) return res.status(400).json({
+        message : "failed to find the file"
+    })
+    console.log(await cloudinary.uploader.destroy(file.publicId,{resource_type : "image"}));
+    
+    // Remove from database
+    project.files=project.files.filter(file => file.publicId !==filename)
+    
+    res.status(200).send(await project.save());
 
   } catch (error) {
     console.error('delete error:', error);
@@ -178,24 +216,28 @@ const deleteFile = async (req, res) => {
     });
   }
 }
-const upploadFile = async (req,res,fileName)=>{
+// project.files = req.files.map(file => ({
+//   url: file.path,
+//   publicId: file.filename,
+//   resourceType: file.resource_type
+// }));
+
+const upploadFile = async (req,res)=>{
     try {
         if(!req.file){
             return res.status(400,404).json({
                 success : false,
                 message : "there is an upload error",
-                 
-
             })
-
         }
-
         const project = await Project.findByIdAndUpdate({_id : req.params.id},
-            {$push: {files : fileName}},
+            {$push: {files : {
+                url: req.file.path,
+                publicId : req.file.filename
+            }}},
             {new : true}
             
         );
-        fileName = "";
         if(!project){
             return res.status(400).json({
                 success : false,

@@ -1,7 +1,7 @@
-const mongoose = require('mongoose');
-const User = require('../models/user.model');
+ const User = require('../models/user.model');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cloudinary = require("../config/cloudinary")
 
 const addAdmin= async ()=>{
     try{
@@ -33,21 +33,23 @@ const addAdmin= async ()=>{
     }
 }
 
-const addUser = async(req,res,fileName)=>{
+const addUser = async(req,res,imageUrl)=>{
     try{
         let {fullName,email,password,phone,tools} = req.body;
         let user = new User();
         user.fullName=fullName;
         user.email = email;
 
-        if(fileName.length > 0) user.image = fileName;
+        
         user.tools = JSON.parse(tools);
         user.password = bcrypt.hashSync(password,10);
         user.role = 'user';
         user.phone = phone;
         user.date = new Date();
+        user.publicId = req.file ? req.file.filename : null;
+        user.image = imageUrl; 
         let savedUser = await user.save();
-        res.status(200,201).send(savedUser);
+        res.status(200).send(savedUser);
         
         
 
@@ -122,14 +124,21 @@ const byId= async (req,res)=>{
 }
 
 
-const udpateUser = async(req,res,fileName)=>{
+const udpateUser = async(req,res,imageUrl)=>{
     try{
         let data = req.body;
-
-        if (fileName && fileName.trim().length > 0) {
-            data.image = fileName;
-        } else {
-            delete data.image;
+        let user = await User.findById({_id : req.params.id})
+        if(!user){
+            return res.send(400).json({
+                message : "the user doesnot exist"
+            })
+        }
+        if(req.file){
+            if(user.publicId){
+                await cloudinary.uploader.destroy(user.publicId)
+            }
+            data.image = imageUrl
+            data.publicId = req.file ? req.file.filename : null ;
         }
         if (data.tools) {
             if (typeof data.tools === 'string') {
@@ -173,6 +182,16 @@ const udpateUser = async(req,res,fileName)=>{
 
 const deleteUser = async(req,res)=>{
     try{
+        let userTodelete = await User.findById({_id : req.params.id});
+        if (!userTodelete){
+            return res.status(400).json({
+                message : "user not found"
+            })
+
+        }
+        if(userTodelete.publicId){
+            await cloudinary.uploader.destroy(userTodelete.publicId)
+        }
         let userToBeDeleted = await User.findByIdAndDelete({ _id : req.params.id });
         res.status(200).send(userToBeDeleted);
     }

@@ -1,17 +1,20 @@
 const Client = require("../models/client.model");
+const cloudinary = require("../config/cloudinary");
 
 
-
-const createClient = async (req,res,fileName)=>{
+const createClient = async (req,res,imageUrl)=>{
 
 
     try{
         let data = req.body;
-        data.image = fileName
-        
-        const client = await (new Client(data)).save();
-        client.date = new Date();
+        data.image = imageUrl
+        const imageId = req.file ? req.file.filename : null ;
+        data.publicId = imageId
+        data.date = new Date();
+        const client = await (new Client(data)).save();     
         res.status(200).send(client);
+        console.log(client);
+        
     }
     catch(err){
         res.status(400).send(err);
@@ -21,17 +24,27 @@ const createClient = async (req,res,fileName)=>{
 
 
 }
-const updateClient = async(req,res,fileName)=>{
+const updateClient = async(req,res,imageUrl)=>{
     try{
+        const client = await Client.findById({ _id : req.params.id})
         let data = req.body;
-        if (fileName && fileName.trim().length > 0) {
-            data.image = fileName;
-        } else {
-            delete data.image;
+        if(!client)
+            return res.status(400).json({
+                message : "client doesn't exist"
+            });
+        if(req.file){
+            if(client.publicId){
+                await cloudinary.uploader.destroy(client.publicId)
+            }
+            data.image = imageUrl;
+            data.publicId = req.file.filename
         }
+        
      
-        const toUpdateClient = await Client.findByIdAndUpdate({ _id : req.params.id },data);
-        res.status(200).send(toUpdateClient);
+        const updatedClient = await Client.findByIdAndUpdate({ _id : req.params.id },data,{ new: true });
+        console.log(updatedClient);
+        res.status(200).send(updatedClient);
+        
     }
     catch(err){
         res.status(400).send( { message : 'error' } );
@@ -68,6 +81,13 @@ const listClients = async (req,res)=>{
 }
 const deleteClient = async (req,res)=>{
     try{
+        const client = await Client.findById({ _id : req.params.id })
+        if(!client) return res.status(400).json({
+            message : "client not found"
+        })
+        if(client.publicId){
+            await cloudinary.uploader.destroy(client.publicId)
+        }
         res.status(200).send(await Client.findByIdAndDelete({ _id : req.params.id }));
     }
     catch(err){

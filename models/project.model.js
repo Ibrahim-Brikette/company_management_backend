@@ -31,10 +31,12 @@ const Project = mongoose.model('Project',{
     endDate : {
         type : Date
     },
-    files : {
-        type : Array,
-        default : []
-    },
+    files :[
+        {
+            url : String,
+            publicId: String
+        }
+    ],
     budget : {
         type : String,
         required : true,
