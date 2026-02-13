@@ -40,6 +40,9 @@ app.use('/project',projectRoute);
 app.use('/images/users',express.static('./uploads/users'));
 app.use('/images/clients',express.static('./uploads/clients'));
 app.use('/files',express.static('./uploads/files'));
+app.get('/', (req, res) => {
+  res.send('API is running 🚀');
+});
 // app.get('/files/projects/:filename', downloadFile);
 
 // ============================================
@@ -88,7 +91,7 @@ app.use('/files',express.static('./uploads/files'));
 //   }
 // });
 
-const PORT = process.env.PORT ||3000
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT,()=>{
     console.log('the app is working little boy');
